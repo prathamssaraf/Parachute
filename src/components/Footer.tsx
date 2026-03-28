@@ -1,4 +1,3 @@
-import Logo from "@/components/Logo";
 
 export default function Footer() {
   return (
@@ -7,7 +6,6 @@ export default function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <Logo size={20} className="text-emerald-400" />
             <span className="text-sm font-semibold tracking-tight">
               Para<span className="text-emerald-400">chute</span>
             </span>

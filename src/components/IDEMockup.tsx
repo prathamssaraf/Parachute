@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Logo from "@/components/Logo";
 import {
   ChevronRight,
   ChevronDown,
@@ -670,7 +669,7 @@ export default function IDEMockup() {
         </div>
 
         <div className="flex items-center gap-2 text-[11px] text-gray-500 font-mono">
-          <Logo size={14} className="text-emerald-400" />
+          <span className="text-emerald-400 font-bold text-xs">P</span>
           <span className="text-gray-400">workspace</span>
           <span className="text-gray-700">/</span>
           <span className="text-white">acme-saas-app</span>
@@ -1034,7 +1033,7 @@ export default function IDEMockup() {
           {/* Orchestrator Intelligence */}
           <div className="p-3 border-b border-white/[0.04]">
             <div className="flex items-center gap-1.5 mb-2.5">
-              <Logo size={14} className="text-emerald-400" />
+              <span className="text-emerald-400 font-bold text-xs">P</span>
               <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-medium">Orchestrator AI</span>
               <Loader2 className="w-2.5 h-2.5 text-emerald-400/50 animate-spin ml-auto" />
             </div>

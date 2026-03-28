@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import Logo from "@/components/Logo";
 
 const navLinks = [
   { name: "Features", href: "#features" },
@@ -26,7 +25,6 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <a href="#" className="flex items-center gap-2.5">
-            <Logo size={28} className="text-emerald-400" />
             <span className="text-lg font-semibold tracking-tight">
               Para<span className="text-emerald-400">chute</span>
             </span>

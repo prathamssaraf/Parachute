@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Logo from "@/components/Logo";
 import {
   X,
   ChevronRight,
@@ -450,7 +449,7 @@ export default function DemoWalkthrough({ onClose }: { onClose: () => void }) {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 shrink-0">
         <div className="flex items-center gap-2">
-          <Logo size={18} className="text-emerald-400" />
+          <span class="text-emerald-400 font-bold text-sm">P</span>
           <span className="text-sm text-gray-400 font-medium">Parachute Demo</span>
           <span className="text-xs text-gray-600 ml-2">
             Step {step + 1} of {STEPS.length}
@@ -496,7 +495,7 @@ export default function DemoWalkthrough({ onClose }: { onClose: () => void }) {
                 <span className="ml-3 text-[11px] text-gray-600 font-mono">Parachute</span>
               </div>
               <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1.5">
-                <Logo size={14} className="text-emerald-400" />
+                <span class="text-emerald-400 font-bold text-xs">P</span>
                 <span>workspace /</span>
                 {step >= 0 && (
                   <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-white">
@@ -877,7 +876,7 @@ export default function DemoWalkthrough({ onClose }: { onClose: () => void }) {
                 {/* Orchestrator AI — task assignments */}
                 <div className="p-3 border-b border-white/[0.04]">
                   <div className="flex items-center gap-1.5 mb-2.5">
-                    <Logo size={14} className="text-emerald-400" />
+                    <span class="text-emerald-400 font-bold text-xs">P</span>
                     <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-medium">Orchestrator AI</span>
                     {step >= 1 && <Loader2 className="w-2.5 h-2.5 text-emerald-400/50 animate-spin ml-auto" />}
                   </div>
@@ -1017,7 +1016,7 @@ export default function DemoWalkthrough({ onClose }: { onClose: () => void }) {
               transition={{ delay: 0.2, type: "spring" }}
               className="text-center"
             >
-              <Logo size={48} className="text-emerald-400 mx-auto mb-4" />
+              <span class="text-emerald-400 font-bold text-4xl block mx-auto mb-4">P</span>
               <h2 className="text-3xl font-bold mb-2">
                 Para<span className="text-emerald-400">chute</span>
               </h2>
