@@ -1,0 +1,214 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020202;
+  --foreground: #ededed;
+  --accent: #34d399;
+  --accent-glow: #6ee7b7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Noise Texture Overlay */
+.bg-noise {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 50;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Glass Effects */
+.glass {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-accent {
+  background: rgba(52, 211, 153, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  box-shadow: 0 0 40px rgba(52, 211, 153, 0.05);
+}
+
+/* Grid Background */
+.grid-bg {
+  background-size: 60px 60px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-subtle {
+  background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow Effects */
+.text-glow {
+  text-shadow: 0 0 30px rgba(52, 211, 153, 0.3);
+}
+
+.box-glow {
+  box-shadow: 0 0 60px rgba(52, 211, 153, 0.08), 0 0 120px rgba(52, 211, 153, 0.04);
+}
+
+.box-glow-sm {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.06);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #020202;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #34d399;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes scroll-x {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.animate-scroll-x {
+  animation: scroll-x 25s linear infinite;
+}
+
+/* Cursor blink - realistic IDE */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.animate-cursor-blink {
+  animation: cursor-blink 1.06s step-end infinite;
+}
+
+/* Shimmer for AI generating */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-line {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Agent progress bar shimmer */
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.progress-shimmer {
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+/* Rotating multi-agent glow border */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes rotate-glow {
+  to { --glow-angle: 360deg; }
+}
+
+/* Demo overlay */
+.demo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.97);
+}
+
+/* Confetti particle */
+@keyframes confetti-rise {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-120px) rotate(360deg); opacity: 0; }
+}
+.confetti-particle {
+  animation: confetti-rise 2.5s ease-out forwards;
+}
+
+/* Step fade */
+@keyframes step-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.step-fade-in {
+  animation: step-fade-in 0.4s ease-out;
+}
+
+/* Glow pulse */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(52, 211, 153, 0); }
+  50% { box-shadow: 0 0 20px rgba(52, 211, 153, 0.3); }
+}
+.glow-pulse {
+  animation: glow-pulse 1s ease-in-out;
+}
+
+/* Section divider */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.2), transparent);
+}
