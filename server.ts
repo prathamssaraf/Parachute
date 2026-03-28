@@ -529,6 +529,145 @@ function handleApi(req: IncomingMessage, res: ServerResponse): boolean {
     return true;
   }
 
+  // POST /api/agent/run — call K2 Think V2 to generate code
+  if (pathname === "/api/agent/run" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+    req.on("end", async () => {
+      try {
+        const { code, filePath, prompt, allFiles } = JSON.parse(body) as {
+          code: string; filePath: string; prompt: string; allFiles?: Record<string, string>;
+        };
+        const workspace = workspaces.get(code);
+        if (!workspace) { sendJson(res, 404, { error: "Workspace not found" }); return; }
+
+        // Read current file content
+        const yText = workspace.doc.getText(`file:${filePath}`);
+        const currentContent = yText.toString();
+
+        // Build context from all files
+        let filesContext = "";
+        if (allFiles) {
+          for (const [fp, content] of Object.entries(allFiles)) {
+            if (fp !== filePath && content.trim()) {
+              filesContext += `\n--- ${fp} ---\n${content}\n`;
+            }
+          }
+        }
+
+        const systemPrompt = `You are an expert coding assistant working in a collaborative workspace called Parachute.
+You are editing the file "${filePath}".
+${filesContext ? `\nHere are the other files in the workspace for context:\n${filesContext}` : ""}
+
+IMPORTANT RULES:
+- Return ONLY the code to ADD to the file. Do NOT return the existing content.
+- Do NOT wrap in markdown code fences or backticks.
+- Write clean, working code.
+- Be concise — add only what's needed.`;
+
+        const messages = [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Current content of ${filePath}:\n\`\`\`\n${currentContent}\n\`\`\`\n\nRequest: ${prompt}` },
+        ];
+
+        const apiKey = process.env.K2_API_KEY || "IFM-YVguZbPpeOXIeRaz";
+
+        // Stream response via SSE
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        });
+
+        const apiRes = await fetch("https://api.k2think.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "MBZUAI-IFM/K2-Think-v2",
+            messages,
+            stream: true,
+            max_tokens: 2048,
+          }),
+        });
+
+        if (!apiRes.ok || !apiRes.body) {
+          res.write(`data: ${JSON.stringify({ type: "error", content: `K2 API error: ${apiRes.status}` })}\n\n`);
+          res.end();
+          return;
+        }
+
+        const reader = apiRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullContent = "";
+        let thinkingDone = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta;
+              if (!delta) continue;
+
+              // Handle reasoning/thinking tokens
+              if (delta.reasoning_content) {
+                res.write(`data: ${JSON.stringify({ type: "thinking", content: delta.reasoning_content })}\n\n`);
+                continue;
+              }
+
+              if (delta.content) {
+                // K2 may include <think>...</think> in content — strip it
+                let text = delta.content;
+                if (!thinkingDone) {
+                  if (text.includes("</think>")) {
+                    text = text.split("</think>").pop() || "";
+                    thinkingDone = true;
+                  } else if (fullContent.length === 0 || !thinkingDone) {
+                    // Could be inside think block, check accumulated
+                    fullContent += text;
+                    if (fullContent.includes("</think>")) {
+                      fullContent = fullContent.split("</think>").pop() || "";
+                      thinkingDone = true;
+                      text = "";
+                    } else {
+                      continue; // skip until thinking is done
+                    }
+                  }
+                }
+                if (text) {
+                  fullContent = thinkingDone ? fullContent + text : text;
+                  res.write(`data: ${JSON.stringify({ type: "content", content: text })}\n\n`);
+                }
+              }
+            } catch {}
+          }
+        }
+
+        // Clean code fences from final content
+        let cleaned = fullContent.replace(/```[\w]*\n?/g, "").replace(/```\s*$/g, "").trim();
+        res.write(`data: ${JSON.stringify({ type: "done", fullContent: cleaned })}\n\n`);
+        res.end();
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ type: "error", content: err.message || "Unknown error" })}\n\n`);
+        res.end();
+      }
+    });
+    return true;
+  }
+
   return false;
 }
 

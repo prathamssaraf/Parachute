@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { createWorkspace } from "@/lib/yjs";
 import { runAgentSimulation, ActivityEvent, AgentFlow, AgentStatus } from "@/components/workspace/AgentSimulator";
+import { runK2Agent } from "@/lib/k2Agent";
 import {
   registerAgent, unregisterAgent, broadcastEvent, determineFlow,
   observeOrchestratorEvents, observeAgentRegistry,
@@ -496,7 +497,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (!docRef.current || agentRunning) return;
 
     const doc = docRef.current;
-    const agentName = `Claude (${userName})`;
+    const agentName = `K2 Think (${userName})`;
     const runId = Math.random().toString(36).slice(2, 9);
     currentRunId.current = runId;
 
@@ -533,25 +534,68 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     setAgentRunning(true);
 
+    const targetFile = decision.assignedFile;
+    const hasRealPrompt = prompt.trim().length > 0;
+
     // Wrap onEvent to also broadcast
     const broadcastingOnEvent = (event: ActivityEvent) => {
       broadcastEvent(doc, event.type, event.agent, event.agentColor, event.msg);
     };
 
     try {
-      await runAgentSimulation({
-        doc,
-        activeFile: decision.assignedFile,
-        agentName,
-        agentColor: userColor,
-        flow: decision.flow,
-        lockedBy: decision.lockedBy,
-        onEvent: broadcastingOnEvent,
-        onStatusUpdate: handleStatusUpdate,
-      });
+      if (hasRealPrompt) {
+        // ── REAL K2 AGENT ──
+        const meta = doc.getMap("agent-meta");
+        meta.set("lockFile", targetFile);
+        meta.set("lockOwner", agentName);
+
+        broadcastEvent(doc, "info", agentName, userColor,
+          `Thinking about: "${prompt.trim().slice(0, 60)}${prompt.length > 60 ? "..." : ""}"`);
+        handleStatusUpdate(targetFile, "thinking");
+
+        await runK2Agent({
+          doc,
+          workspaceCode: resolvedCode,
+          filePath: targetFile,
+          prompt: prompt.trim(),
+          agentName,
+          agentColor: userColor,
+          allFiles,
+          onThinking: (text) => {
+            handleStatusUpdate(targetFile, "thinking");
+          },
+          onTyping: (file) => {
+            broadcastEvent(doc, "info", agentName, userColor, `Writing code to ${file}...`);
+            handleStatusUpdate(file, "writing");
+            setModifiedFiles(prev => new Set([...prev, file]));
+          },
+          onDone: (summary) => {
+            broadcastEvent(doc, "success", agentName, userColor, summary);
+          },
+          onError: (err) => {
+            broadcastEvent(doc, "warning", agentName, userColor, `Error: ${err}`);
+          },
+        });
+
+        meta.set("lockFile", "");
+        meta.set("lockOwner", "");
+        setPrompt("");
+      } else {
+        // ── DEMO SIMULATION (no prompt) ──
+        await runAgentSimulation({
+          doc,
+          activeFile: targetFile,
+          agentName,
+          agentColor: userColor,
+          flow: decision.flow,
+          lockedBy: decision.lockedBy,
+          onEvent: broadcastingOnEvent,
+          onStatusUpdate: handleStatusUpdate,
+        });
+      }
 
       broadcastEvent(doc, "success", "Orchestrator", "emerald",
-        `${userName}'s agent completed work on ${decision.assignedFile} ✓`);
+        `${userName}'s agent completed work on ${targetFile} ✓`);
     } catch (err) {
       broadcastEvent(doc, "warning", "Orchestrator", "emerald",
         `${userName}'s agent encountered an error`);
@@ -909,7 +953,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <input
               type="text" value={prompt} onChange={e => setPrompt(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !agentRunning && handleRunAgent()}
-              placeholder={`Ask Claude to edit ${activeFile}...`}
+              placeholder={`Ask K2 Think to edit ${activeFile}...`}
               className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
             />
             <button onClick={handleRunAgent} disabled={agentRunning}
