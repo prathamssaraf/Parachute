@@ -570,7 +570,7 @@ IMPORTANT RULES:
           { role: "user", content: `Current content of ${filePath}:\n\`\`\`\n${currentContent}\n\`\`\`\n\nRequest: ${prompt}` },
         ];
 
-        const apiKey = process.env.K2_API_KEY || "IFM-YVguZbPpeOXIeRaz";
+        const apiKey = process.env.K2_API_KEY || "";
 
         // Stream response via SSE
         res.writeHead(200, {
