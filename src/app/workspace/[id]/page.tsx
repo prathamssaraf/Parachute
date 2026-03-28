@@ -13,7 +13,7 @@ import {
   Circle,
   CheckCircle2,
   AlertTriangle,
-  Hexagon,
+  // Hexagon removed — using Logo component
   Copy,
   Check,
   ChevronRight,
@@ -36,6 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { createWorkspace } from "@/lib/yjs";
+import Logo from "@/components/Logo";
 import { runAgentSimulation, ActivityEvent, AgentFlow, AgentStatus } from "@/components/workspace/AgentSimulator";
 import { runK2Agent } from "@/lib/k2Agent";
 import {
@@ -171,7 +172,7 @@ function JoinSplash({ workspaceId, onJoin }: { workspaceId: string; onJoin: (nam
     <div className="min-h-screen bg-[#0e0e0e] grid-bg flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <Hexagon className="w-6 h-6 text-emerald-400" />
+          <Logo size={24} className="text-emerald-400" />
           <span className="text-white font-semibold text-lg tracking-tight">Parachute</span>
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -698,7 +699,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       <div className="h-9 border-b border-white/[0.1] flex items-center px-2 gap-0 shrink-0 select-none text-[12px]"
         onClick={() => setActiveMenu(null)}>
         <div className="flex items-center gap-1.5 px-2 mr-2">
-          <Hexagon className="w-3.5 h-3.5 text-emerald-400" />
+          <Logo size={16} className="text-emerald-400" />
         </div>
 
         {/* File menu */}
