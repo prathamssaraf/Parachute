@@ -1,4 +1,4 @@
-app = 'parachute'
+app = 'parachute-yhack'
 primary_region = 'ewr'
 
 [build]
