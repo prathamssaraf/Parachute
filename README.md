@@ -6,7 +6,7 @@
 
 A real-time, multi-user cloud IDE where every developer brings their own AI coding agent, and a master Orchestrator AI keeps them all in sync.
 
-**Built at [YHack 2025](https://yhack.org)**
+**Built at [YHack 2026](https://yhack.org)**
 
 [Getting Started](#getting-started) | [How It Works](#how-it-works) | [Architecture](#architecture) | [Tech Stack](#tech-stack)
 
@@ -216,6 +216,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 <div align="center">
 
-Built with long nights and too much caffeine at **YHack 2025**.
+Built with long nights and too much caffeine at **YHack 2026**.
 
 </div>
