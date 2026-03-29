@@ -54,6 +54,7 @@ export default function Navbar() {
             <a
               href="/workspace/new"
               className="px-4 py-2 text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg transition-colors"
+              title="Hosted on Render free tier — may be slow or run out of memory"
             >
               Try It Live
             </a>

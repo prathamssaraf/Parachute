@@ -52,6 +52,9 @@ export default function CTA() {
               Try Live Preview
               <ArrowRight className="w-4 h-4 text-emerald-400" />
             </a>
+            <p className="mt-3 text-[11px] text-yellow-500/70 max-w-sm mx-auto">
+              Hosted on Render free tier (0.1 CPU, 512MB RAM). The server may be slow to start or run out of memory under load. For the best experience, request a local demo.
+            </p>
           </div>
         </motion.div>
       </div>
