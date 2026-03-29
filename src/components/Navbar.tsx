@@ -52,10 +52,10 @@ export default function Navbar() {
               GitHub
             </a>
             <a
-              href="#waitlist"
+              href="/workspace/new"
               className="px-4 py-2 text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg transition-colors"
             >
-              Join Waitlist
+              Try It Live
             </a>
           </div>
 
@@ -88,10 +88,10 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="#waitlist"
+              href="/workspace/new"
               className="px-4 py-2 text-sm font-medium bg-emerald-500 text-black rounded-lg text-center"
             >
-              Join Waitlist
+              Try It Live
             </a>
           </div>
         </motion.div>

@@ -41,6 +41,18 @@ export default function CTA() {
           <p className="mt-4 text-xs text-gray-600">
             No spam. We&apos;ll only email you when it&apos;s ready.
           </p>
+
+          {/* Judge preview button */}
+          <div className="mt-10 pt-8 border-t border-white/[0.06]">
+            <p className="text-sm text-gray-500 mb-4">Are you a judge? Try the live preview.</p>
+            <a
+              href="/workspace/new"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] hover:border-emerald-500/30 text-white font-medium rounded-lg transition-all text-sm"
+            >
+              Try Live Preview
+              <ArrowRight className="w-4 h-4 text-emerald-400" />
+            </a>
+          </div>
         </motion.div>
       </div>
     </section>
