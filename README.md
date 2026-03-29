@@ -210,9 +210,9 @@ Contributions are welcome. Please open an issue first to discuss what you would 
 
 ## Team
 
-- Siddh Mandirwala
-- Krish Murjani
 - Pratham Saraf
+- Krish Murjani
+- Siddh Mandirwala
 
 ## License
 
