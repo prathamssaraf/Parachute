@@ -374,6 +374,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [activeAgents, setActiveAgents] = useState<AgentRegistration[]>([]);
   const currentRunId = useRef<string | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState("Claude Code");
   const [copied, setCopied] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(256);
   const terminalDragRef = useRef<{ startY: number; startH: number } | null>(null);
@@ -497,7 +498,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (!docRef.current || agentRunning) return;
 
     const doc = docRef.current;
-    const agentName = `K2 Think (${userName})`;
+    const agentName = `${selectedAgent} (${userName})`;
     const runId = Math.random().toString(36).slice(2, 9);
     currentRunId.current = runId;
 
@@ -950,11 +951,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               Terminal
             </button>
             <div className="w-px h-6 bg-white/[0.06]" />
+            {/* Agent picker */}
+            <select
+              value={selectedAgent}
+              onChange={e => setSelectedAgent(e.target.value)}
+              className="bg-white/[0.07] border border-white/[0.1] rounded-lg text-[11px] text-gray-300 px-2 py-1.5 outline-none cursor-pointer hover:bg-white/[0.12] transition appearance-none"
+              style={{ backgroundImage: "none" }}
+            >
+              <option value="Claude Code" style={{ background: "#1a1a1a" }}>Claude Code</option>
+              <option value="Codex" style={{ background: "#1a1a1a" }}>Codex</option>
+              <option value="Gemini" style={{ background: "#1a1a1a" }}>Gemini</option>
+              <option value="Cursor" style={{ background: "#1a1a1a" }}>Cursor</option>
+            </select>
             <Bot className="w-4 h-4 text-emerald-400 shrink-0" />
             <input
               type="text" value={prompt} onChange={e => setPrompt(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !agentRunning && handleRunAgent()}
-              placeholder={`Ask K2 Think to edit ${activeFile}...`}
+              placeholder={`Ask ${selectedAgent} to edit ${activeFile}...`}
               className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
             />
             <button onClick={handleRunAgent} disabled={agentRunning}
