@@ -714,6 +714,37 @@ function handleApi(req: IncomingMessage, res: ServerResponse): boolean {
     return true;
   }
 
+  // GET /api/workspaces/files/read?code=X&path=Y — read file and seed into Yjs
+  if (pathname === "/api/workspaces/files/read" && req.method === "GET") {
+    const code = parsed.query.code as string;
+    const filePath = parsed.query.path as string;
+    const workspace = workspaces.get(code);
+    if (!workspace) { sendJson(res, 404, { error: "Workspace not found" }); return true; }
+    if (!filePath) { sendJson(res, 400, { error: "Missing path" }); return true; }
+
+    const resolved = path.resolve(workspace.folder, filePath);
+    if (!resolved.startsWith(path.resolve(workspace.folder))) {
+      sendJson(res, 400, { error: "Invalid path" }); return true;
+    }
+    if (!fs.existsSync(resolved) || fs.statSync(resolved).isDirectory()) {
+      sendJson(res, 404, { error: "File not found" }); return true;
+    }
+
+    try {
+      const content = fs.readFileSync(resolved, "utf-8");
+      // Seed into Yjs if not already there
+      const yText = workspace.doc.getText(`file:${filePath}`);
+      if (yText.toString() === "" && content.length > 0) {
+        workspace.doc.transact(() => yText.insert(0, content));
+        workspace.contentHashes.set(filePath, md5(content));
+      }
+      sendJson(res, 200, { content });
+    } catch {
+      sendJson(res, 500, { error: "Failed to read file" });
+    }
+    return true;
+  }
+
   // POST /api/workspaces/files/create — create file or folder
   if (pathname === "/api/workspaces/files/create" && req.method === "POST") {
     let body = "";

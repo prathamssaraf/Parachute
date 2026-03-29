@@ -401,7 +401,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (!resolvedCode) return;
     fetchFiles(resolvedCode);
-    const interval = setInterval(() => fetchFiles(resolvedCode), 5000);
+    const interval = setInterval(() => fetchFiles(resolvedCode), 2000);
     return () => clearInterval(interval);
   }, [resolvedCode, fetchFiles]);
 
@@ -886,6 +886,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 provider={providerRef.current}
                 filePath={activeFile}
                 initialContent=""
+                workspaceCode={resolvedCode}
                 onContentChange={() => setModifiedFiles(prev => new Set([...prev, activeFile]))}
               />
             ) : (

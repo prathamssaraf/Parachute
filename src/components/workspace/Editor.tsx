@@ -11,6 +11,7 @@ interface EditorProps {
   provider: WebsocketProvider;
   filePath: string;
   initialContent: string;
+  workspaceCode?: string;
   onContentChange?: (content: string) => void;
 }
 
@@ -39,6 +40,7 @@ export default function Editor({
   provider,
   filePath,
   initialContent,
+  workspaceCode,
   onContentChange,
 }: EditorProps) {
   const editorRef     = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
@@ -49,12 +51,25 @@ export default function Editor({
 
   const yText = doc.getText(`file:${filePath}`);
 
-  // Seed Y.Text with initial content the first time (when doc is empty for this file)
+  // Seed Y.Text — fetch from server if Yjs doc is empty (file created via terminal)
   useEffect(() => {
-    if (yText.toString() === "") {
+    if (yText.toString() !== "") return;
+    if (initialContent) {
       doc.transact(() => yText.insert(0, initialContent));
+      return;
     }
-  }, [doc, yText, filePath, initialContent]);
+    // File might exist on disk but not in Yjs — fetch it
+    if (workspaceCode) {
+      fetch(`/api/workspaces/files/read?code=${workspaceCode}&path=${encodeURIComponent(filePath)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.content && yText.toString() === "") {
+            doc.transact(() => yText.insert(0, data.content));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [doc, yText, filePath, initialContent, workspaceCode]);
 
   // Y.Text → Monaco: apply remote changes into the editor
   useEffect(() => {
