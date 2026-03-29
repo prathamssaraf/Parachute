@@ -208,6 +208,12 @@ Contributions are welcome. Please open an issue first to discuss what you would 
 4. Push to the branch (`git push origin feature/my-feature`)
 5. Open a Pull Request
 
+## Team
+
+- Siddh Mandirwala
+- Krish Murjani
+- Pratham Saraf
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
