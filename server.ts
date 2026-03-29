@@ -44,10 +44,258 @@ function md5(content: string): string {
 }
 
 const TEMPLATE_FILES: Record<string, string> = {
-  "index.ts": `import { createServer } from 'http'\n\nconst PORT = 3000\n\nconst server = createServer((req, res) => {\n  res.end('Hello World')\n})\n\nserver.listen(PORT)\n`,
-  "utils.ts": `export function formatDate(date: Date): string {\n  return date.toISOString().split('T')[0]\n}\n`,
-  "types.ts": `export interface User {\n  id: string\n  name: string\n  email: string\n}\n`,
-  "README.md": `# Workspace\n\nA collaborative workspace powered by Parachute.\n`,
+  "schema.ts": `import { pgTable, uuid, text, timestamp, boolean, integer } from "drizzle-orm/pg-core"
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  avatar: text("avatar").default("default.png"),
+  role: text("role", { enum: ["admin", "member", "viewer"] }).default("member"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+export const projects = pgTable("projects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  ownerId: uuid("owner_id").references(() => users.id),
+  isPublic: boolean("is_public").default(false),
+  starCount: integer("star_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+})
+
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").references(() => projects.id),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+})
+`,
+  "routes.ts": `import { Hono } from "hono"
+import { cors } from "hono/cors"
+import { jwt } from "hono/jwt"
+import { db } from "./db"
+import { users, projects, apiKeys } from "./schema"
+import { eq, desc, and } from "drizzle-orm"
+
+const app = new Hono()
+
+app.use("/*", cors({ origin: "*" }))
+app.use("/api/*", jwt({ secret: process.env.JWT_SECRET! }))
+
+// Health check
+app.get("/health", (c) => c.json({ status: "ok", uptime: process.uptime() }))
+
+// List projects for authenticated user
+app.get("/api/projects", async (c) => {
+  const userId = c.get("jwtPayload").sub
+  const result = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.ownerId, userId))
+    .orderBy(desc(projects.createdAt))
+  return c.json(result)
+})
+
+// Get project by slug
+app.get("/api/projects/:slug", async (c) => {
+  const slug = c.req.param("slug")
+  const project = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .limit(1)
+  if (!project.length) return c.json({ error: "Not found" }, 404)
+  return c.json(project[0])
+})
+
+// Create project
+app.post("/api/projects", async (c) => {
+  const userId = c.get("jwtPayload").sub
+  const body = await c.req.json()
+  const result = await db.insert(projects).values({
+    name: body.name,
+    slug: body.name.toLowerCase().replace(/\\s+/g, "-"),
+    description: body.description,
+    ownerId: userId,
+  }).returning()
+  return c.json(result[0], 201)
+})
+
+export default app
+`,
+  "auth.ts": `import { sign, verify } from "hono/jwt"
+import { db } from "./db"
+import { users } from "./schema"
+import { eq } from "drizzle-orm"
+import bcrypt from "bcryptjs"
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me"
+const TOKEN_EXPIRY = 60 * 60 * 24 * 7 // 7 days
+
+export async function authenticateUser(email: string, password: string) {
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1)
+
+  if (!result.length) {
+    throw new Error("Invalid credentials")
+  }
+
+  const user = result[0]
+  // Password verification would go here
+  // const valid = await bcrypt.compare(password, user.passwordHash)
+
+  const token = await sign(
+    { sub: user.id, email: user.email, role: user.role },
+    JWT_SECRET
+  )
+
+  return { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } }
+}
+
+export async function validateToken(token: string) {
+  try {
+    const payload = await verify(token, JWT_SECRET)
+    return payload
+  } catch {
+    return null
+  }
+}
+
+export async function getUserById(id: string) {
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1)
+  return result[0] || null
+}
+`,
+  "middleware.ts": `import type { Context, Next } from "hono"
+import { getUserById } from "./auth"
+
+export async function rateLimiter(c: Context, next: Next) {
+  const ip = c.req.header("x-forwarded-for") || "unknown"
+  // In production: check Redis for rate limit
+  // const count = await redis.incr(\`rate:\${ip}\`)
+  // if (count > 100) return c.json({ error: "Rate limited" }, 429)
+  await next()
+}
+
+export async function logger(c: Context, next: Next) {
+  const start = Date.now()
+  await next()
+  const ms = Date.now() - start
+  console.log(\`\${c.req.method} \${c.req.url} \${c.res.status} \${ms}ms\`)
+}
+
+export async function requireAdmin(c: Context, next: Next) {
+  const payload = c.get("jwtPayload")
+  if (!payload) return c.json({ error: "Unauthorized" }, 401)
+
+  const user = await getUserById(payload.sub)
+  if (!user || user.role !== "admin") {
+    return c.json({ error: "Forbidden" }, 403)
+  }
+
+  c.set("user", user)
+  await next()
+}
+`,
+  "tests.ts": `import { describe, it, expect, beforeAll, afterAll } from "vitest"
+import app from "./routes"
+
+describe("API Routes", () => {
+  let authToken: string
+
+  beforeAll(async () => {
+    // Setup test database
+    // authToken = await getTestToken()
+  })
+
+  describe("GET /health", () => {
+    it("returns ok status", async () => {
+      const res = await app.request("/health")
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.status).toBe("ok")
+      expect(body.uptime).toBeGreaterThan(0)
+    })
+  })
+
+  describe("GET /api/projects", () => {
+    it("requires authentication", async () => {
+      const res = await app.request("/api/projects")
+      expect(res.status).toBe(401)
+    })
+
+    it("returns user projects when authenticated", async () => {
+      const res = await app.request("/api/projects", {
+        headers: { Authorization: \`Bearer \${authToken}\` },
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(Array.isArray(body)).toBe(true)
+    })
+  })
+
+  describe("POST /api/projects", () => {
+    it("creates a new project", async () => {
+      const res = await app.request("/api/projects", {
+        method: "POST",
+        headers: {
+          Authorization: \`Bearer \${authToken}\`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Test Project",
+          description: "A test project",
+        }),
+      })
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.name).toBe("Test Project")
+      expect(body.slug).toBe("test-project")
+    })
+  })
+})
+`,
+  "README.md": `# Acme SaaS Platform
+
+A modern API platform built with Hono, Drizzle ORM, and PostgreSQL.
+
+## Stack
+- **Runtime**: Node.js + TypeScript
+- **Framework**: Hono
+- **Database**: PostgreSQL + Drizzle ORM
+- **Auth**: JWT tokens with role-based access
+- **Testing**: Vitest
+
+## Getting Started
+\`\`\`bash
+npm install
+npm run db:migrate
+npm run dev
+\`\`\`
+
+## API Endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /health | No | Health check |
+| GET | /api/projects | Yes | List projects |
+| GET | /api/projects/:slug | Yes | Get project |
+| POST | /api/projects | Yes | Create project |
+`,
 };
 
 function getWorkspaceFiles(folder: string, base = ""): string[] {

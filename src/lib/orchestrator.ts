@@ -114,8 +114,8 @@ export function detectConflicts(doc: Y.Doc): {
       const r = val as AgentRegistration
       if (r.status === 'running') allFiles.add(r.assignedFile)
     })
-    const alternatives = ['utils.ts', 'types.ts', 'README.md', 'index.ts'].filter(f => !allFiles.has(f))
-    const alt = alternatives[0] || 'utils.ts'
+    const alternatives = ['middleware.ts', 'auth.ts', 'tests.ts', 'README.md', 'schema.ts', 'routes.ts'].filter(f => !allFiles.has(f))
+    const alt = alternatives[0] || 'middleware.ts'
 
     return {
       hasConflict: true,
@@ -163,9 +163,9 @@ export function determineFlow(doc: Y.Doc, targetFile: string, agentName: string)
     // File is taken — find alternative
     const busyFiles = new Set(active.map(a => a.assignedFile))
     if (lockFile) busyFiles.add(lockFile)
-    const alternatives = ['utils.ts', 'types.ts', 'README.md', 'index.ts']
+    const alternatives = ['middleware.ts', 'auth.ts', 'tests.ts', 'README.md', 'schema.ts', 'routes.ts']
       .filter(f => !busyFiles.has(f) && f !== targetFile)
-    const alt = alternatives[0] || 'utils.ts'
+    const alt = alternatives[0] || 'middleware.ts'
 
     return {
       flow: active.length >= 2 ? 'integrator' : 'detour',

@@ -26,85 +26,141 @@ export interface AgentSimulatorOptions {
 
 // ─── Code snippets ───────────────────────────────────────────────────────────
 
-// Alice (primary): adds logger middleware to index.ts
-const PRIMARY_INDEX = `
-// Logger middleware
-function createLogger(prefix: string) {
-  return (req: any, res: any, next: () => void) => {
-    const start = Date.now()
-    console.log(\`[\${prefix}] \${req.method} \${req.url}\`)
-    res.on('finish', () => {
-      console.log(\`[\${prefix}] \${res.statusCode} +\${Date.now() - start}ms\`)
-    })
-    next()
-  }
-}
-`
-
-// Bob (detour step 1): adds helpers to utils.ts
-const DETOUR_UTILS = `
-// Duration formatter
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return \`\${ms}ms\`
-  if (ms < 60000) return \`\${(ms / 1000).toFixed(1)}s\`
-  return \`\${Math.floor(ms / 60000)}m \${Math.floor((ms % 60000) / 1000)}s\`
-}
-
-// Bytes formatter
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return \`\${bytes}B\`
-  if (bytes < 1048576) return \`\${(bytes / 1024).toFixed(1)}KB\`
-  return \`\${(bytes / 1048576).toFixed(1)}MB\`
-}
-`
-
-// Bob (detour step 2): adds route handler to index.ts, building on Alice's logger
-const DETOUR_INDEX = `
-// Route handler — uses logger from above
-const logger = createLogger('HTTP')
-
-const serverWithLogging = createServer((req, res) => {
-  logger(req, res, () => {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, path: req.url, ts: Date.now() }))
-  })
+// Agent 1 (primary): extends the schema with team membership + invites
+const PRIMARY_SCHEMA = `
+export const teamMembers = pgTable("team_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["owner", "editor", "viewer"] }).default("editor"),
+  invitedBy: uuid("invited_by").references(() => users.id),
+  joinedAt: timestamp("joined_at").defaultNow(),
 })
 
-serverWithLogging.listen(PORT + 1)
+export const invites = pgTable("invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["editor", "viewer"] }).default("editor"),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+})
 `
 
-// Charlie (integrator): adds TypeScript types for the new utilities
-const INTEGRATOR_TYPES = `
-// Types for logger (added by Claude — Alice's createLogger)
-export type LoggerMiddleware = (req: any, res: any, next: () => void) => void
+// Agent 2 (detour step 1): adds team routes to middleware.ts since routes.ts is locked
+const DETOUR_MIDDLEWARE = `
 
-// Types for format helpers (added by Claude — Bob's formatDuration / formatBytes)
-export type FormatFn = (value: number) => string
+export async function requireProjectAccess(c: Context, next: Next) {
+  const payload = c.get("jwtPayload")
+  const projectId = c.req.param("projectId")
+  if (!payload || !projectId) return c.json({ error: "Unauthorized" }, 401)
 
-export interface ServerConfig {
-  port: number
-  logger: LoggerMiddleware
-  format: {
-    duration: FormatFn
-    bytes: FormatFn
-  }
+  const membership = await db
+    .select()
+    .from(teamMembers)
+    .where(and(
+      eq(teamMembers.projectId, projectId),
+      eq(teamMembers.userId, payload.sub)
+    ))
+    .limit(1)
+
+  if (!membership.length) return c.json({ error: "Not a team member" }, 403)
+  c.set("membership", membership[0])
+  await next()
 }
 `
 
-// Charlie: updates README with the new API surface
+// Agent 2 (detour step 2): adds invite + team endpoints to routes.ts after it's free
+const DETOUR_ROUTES = `
+
+// Team management routes
+app.get("/api/projects/:projectId/team", requireProjectAccess, async (c) => {
+  const projectId = c.req.param("projectId")
+  const members = await db
+    .select({ id: users.id, name: users.name, email: users.email, role: teamMembers.role })
+    .from(teamMembers)
+    .innerJoin(users, eq(teamMembers.userId, users.id))
+    .where(eq(teamMembers.projectId, projectId))
+  return c.json(members)
+})
+
+app.post("/api/projects/:projectId/invite", requireProjectAccess, async (c) => {
+  const projectId = c.req.param("projectId")
+  const { email, role } = await c.req.json()
+  const token = crypto.randomUUID()
+  const invite = await db.insert(invites).values({
+    projectId, email, role,
+    token,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }).returning()
+  // In production: send invite email here
+  return c.json(invite[0], 201)
+})
+`
+
+// Agent 3 (integrator): adds comprehensive tests for the new team endpoints
+const INTEGRATOR_TESTS = `
+
+describe("Team Management", () => {
+  describe("GET /api/projects/:id/team", () => {
+    it("returns team members for a project", async () => {
+      const res = await app.request("/api/projects/test-id/team", {
+        headers: { Authorization: \`Bearer \${authToken}\` },
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(Array.isArray(body)).toBe(true)
+      body.forEach((member: any) => {
+        expect(member).toHaveProperty("name")
+        expect(member).toHaveProperty("email")
+        expect(member).toHaveProperty("role")
+      })
+    })
+
+    it("rejects non-members", async () => {
+      const res = await app.request("/api/projects/other-id/team", {
+        headers: { Authorization: \`Bearer \${outsiderToken}\` },
+      })
+      expect(res.status).toBe(403)
+    })
+  })
+
+  describe("POST /api/projects/:id/invite", () => {
+    it("creates an invite with expiry", async () => {
+      const res = await app.request("/api/projects/test-id/invite", {
+        method: "POST",
+        headers: {
+          Authorization: \`Bearer \${authToken}\`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: "new@example.com", role: "editor" }),
+      })
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.token).toBeDefined()
+      expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now())
+    })
+  })
+})
+`
+
+// Agent 3: updates README with team management docs
 const INTEGRATOR_README = `
-## Utilities
 
-- \`formatDuration(ms)\` — human-readable duration (e.g. \`1.2s\`)
-- \`formatBytes(bytes)\` — human-readable size (e.g. \`3.4KB\`)
-- \`createLogger(prefix)\` — Express-style request logger middleware
+## Team Management
 
-## Servers
+### Endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /api/projects/:id/team | Yes | List team members |
+| POST | /api/projects/:id/invite | Yes | Send invite |
 
-| Port | Description |
-|------|-------------|
-| 3000 | Original Hello World |
-| 3001 | JSON API with logging |
+### Roles
+- **owner** — full access, can delete project
+- **editor** — read/write access to all resources
+- **viewer** — read-only access
 `
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -165,31 +221,31 @@ export async function runAgentSimulation(opts: AgentSimulatorOptions): Promise<v
     meta.set('lockOwner', '')
   }
 
-  // ── PRIMARY FLOW (Alice: first agent) ──────────────────────────────────────
+  // ── PRIMARY FLOW: extends schema.ts with team tables ────────────────────────
   if (flow === 'primary') {
     onStatusUpdate(activeFile, 'thinking')
-    emit('info', `Analyzing codebase...`)
+    emit('info', `Analyzing schema and relationships...`)
     await delay(1400)
 
-    emit('info', `Reading ${activeFile}...`)
+    emit('info', `Reading ${activeFile} — found users, projects, apiKeys tables`)
     await delay(1200)
 
     orch('info', `Agent locked ${activeFile}`)
     lock(activeFile)
     onStatusUpdate(activeFile, 'writing')
 
-    await typeInto(doc, activeFile, PRIMARY_INDEX)
+    await typeInto(doc, activeFile, PRIMARY_SCHEMA)
 
     unlock()
     await delay(300)
-    emit('success', `Done — added logger middleware to ${activeFile} ✓`)
+    emit('success', `Done — added teamMembers + invites tables to ${activeFile} ✓`)
     onStatusUpdate(null, 'idle')
   }
 
-  // ── DETOUR FLOW (Bob: index.ts locked → utils.ts first → back to index.ts) ─
+  // ── DETOUR FLOW: routes.ts locked → middleware.ts first → back to routes.ts ─
   else if (flow === 'detour') {
     onStatusUpdate(activeFile, 'thinking')
-    emit('info', `Analyzing codebase...`)
+    emit('info', `Analyzing codebase structure...`)
     await delay(1400)
 
     emit('info', `Reading ${activeFile}...`)
@@ -198,22 +254,22 @@ export async function runAgentSimulation(opts: AgentSimulatorOptions): Promise<v
     // Detect lock
     orch('conflict', `⚠ ${activeFile} is locked by ${lockedBy || 'another agent'} — rerouting`)
     await delay(600)
-    orch('warning', `Redirecting ${agentName} → utils.ts while ${activeFile} is in use`)
+    orch('warning', `Redirecting ${agentName} → middleware.ts while ${activeFile} is in use`)
     await delay(300)
 
-    // ── Step 1: work on utils.ts ──
-    onStatusUpdate('utils.ts', 'writing')
-    emit('info', `Switching to utils.ts — working on format helpers`)
-    lock('utils.ts')
+    // ── Step 1: work on middleware.ts ──
+    onStatusUpdate('middleware.ts', 'writing')
+    emit('info', `Switching to middleware.ts — adding project access guard`)
+    lock('middleware.ts')
     await delay(400)
 
-    await typeInto(doc, 'utils.ts', DETOUR_UTILS)
+    await typeInto(doc, 'middleware.ts', DETOUR_MIDDLEWARE)
 
     unlock()
-    emit('success', `Finished utils.ts — formatDuration + formatBytes added ✓`)
+    emit('success', `Finished middleware.ts — requireProjectAccess added ✓`)
     await delay(500)
 
-    // ── Step 2: return to index.ts ──
+    // ── Step 2: return to routes.ts ──
     onStatusUpdate(activeFile, 'thinking')
     emit('info', `Returning to ${activeFile}...`)
     await delay(800)
@@ -234,65 +290,65 @@ export async function runAgentSimulation(opts: AgentSimulatorOptions): Promise<v
 
     // Re-read and extend
     const lineCount = doc.getText(`file:${activeFile}`).toString().split('\n').length
-    emit('info', `Re-reading ${activeFile} — found ${lineCount} lines with new changes`)
+    emit('info', `Re-reading ${activeFile} — found ${lineCount} lines, importing new middleware`)
     await delay(900)
 
-    emit('info', `Building route handler on top of Alice's logger...`)
+    emit('info', `Adding team management + invite endpoints...`)
     onStatusUpdate(activeFile, 'writing')
     lock(activeFile)
 
-    await typeInto(doc, activeFile, DETOUR_INDEX)
+    await typeInto(doc, activeFile, DETOUR_ROUTES)
 
     unlock()
     await delay(300)
-    emit('success', `Done — added JSON route handler to ${activeFile} ✓`)
+    emit('success', `Done — added /team and /invite routes to ${activeFile} ✓`)
     onStatusUpdate(null, 'idle')
   }
 
-  // ── INTEGRATOR FLOW (Charlie: types + README, reads what others changed) ────
+  // ── INTEGRATOR FLOW: writes tests + updates docs ──────────────────────────
   else if (flow === 'integrator') {
-    onStatusUpdate('types.ts', 'thinking')
-    emit('info', `Analyzing codebase...`)
+    onStatusUpdate('tests.ts', 'thinking')
+    emit('info', `Scanning workspace for recent changes...`)
     await delay(1400)
 
-    emit('info', `Scanning all modified files...`)
+    emit('info', `Analyzing all modified files...`)
     await delay(1000)
 
     // Read what others did
-    const utilsContent = doc.getText('file:utils.ts').toString()
-    const indexContent = doc.getText('file:index.ts').toString()
-    const hasUtils = utilsContent.includes('formatDuration')
-    const hasLogger = indexContent.includes('createLogger')
+    const schemaContent = doc.getText('file:schema.ts').toString()
+    const routesContent = doc.getText('file:routes.ts').toString()
+    const hasTeamMembers = schemaContent.includes('teamMembers')
+    const hasInviteRoute = routesContent.includes('/invite')
 
-    if (hasUtils) emit('info', `Detected formatDuration + formatBytes in utils.ts`)
+    if (hasTeamMembers) emit('info', `Detected teamMembers + invites tables in schema.ts`)
     await delay(700)
-    if (hasLogger) emit('info', `Detected createLogger middleware in index.ts`)
+    if (hasInviteRoute) emit('info', `Detected /team and /invite endpoints in routes.ts`)
     await delay(700)
 
-    orch('info', `No conflicts detected — ${agentName} integrating changes across types + docs`)
+    orch('info', `No conflicts detected — ${agentName} writing tests + updating docs`)
     await delay(400)
 
-    // ── Step 1: update types.ts ──
-    onStatusUpdate('types.ts', 'writing')
-    emit('info', `Generating TypeScript types for new utilities...`)
-    lock('types.ts')
+    // ── Step 1: add tests ──
+    onStatusUpdate('tests.ts', 'writing')
+    emit('info', `Generating test cases for team management...`)
+    lock('tests.ts')
 
-    await typeInto(doc, 'types.ts', INTEGRATOR_TYPES)
+    await typeInto(doc, 'tests.ts', INTEGRATOR_TESTS)
 
     unlock()
-    emit('success', `Added ServerConfig + LoggerMiddleware + FormatFn types ✓`)
+    emit('success', `Added team member + invite test suites ✓`)
     await delay(600)
 
     // ── Step 2: update README.md ──
     onStatusUpdate('README.md', 'writing')
-    emit('info', `Updating README.md with new API surface...`)
+    emit('info', `Updating README.md with team management docs...`)
     lock('README.md')
 
     await typeInto(doc, 'README.md', INTEGRATOR_README)
 
     unlock()
     await delay(300)
-    emit('success', `Done — updated types.ts + README.md ✓`)
+    emit('success', `Done — updated tests.ts + README.md ✓`)
     onStatusUpdate(null, 'idle')
   }
 
