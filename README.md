@@ -118,6 +118,7 @@ Each workspace is a self-contained directory on the server. The Yjs document is 
 | Server | Custom Node.js HTTP server with [ws](https://github.com/websockets/ws) WebSocket |
 | File Watching | [chokidar](https://github.com/paulmillr/chokidar) |
 | Icons | [Lucide React](https://lucide.dev) |
+| Dev IDE | [Zed](https://zed.dev) — parts of this project were built using Zed, the fast, modern code editor |
 
 ## Getting Started
 
