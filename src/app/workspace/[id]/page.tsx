@@ -264,6 +264,12 @@ function JoinSplash({ workspaceId, onJoin }: { workspaceId: string; onJoin: (nam
             </>
           )}
         </motion.div>
+
+        {/* Free tier warning */}
+        <p className="text-center text-[11px] text-yellow-500/60 mt-5 leading-relaxed max-w-sm mx-auto">
+          Hosted on Render&apos;s free tier (0.1 CPU / 512 MB RAM).
+          Performance may be limited — for the best experience, request a local demo.
+        </p>
       </div>
     </div>
   );
